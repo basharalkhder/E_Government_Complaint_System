@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Contracts\ComplaintRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Http\Requests\SubmitComplaintRequest;
+use App\Models\Complaint;
+use App\Events\ComplaintStatusUpdated;
 use Illuminate\Support\Facades\Auth;
 
 class ComplaintController extends Controller
@@ -31,33 +34,58 @@ class ComplaintController extends Controller
     }
 
 
-    public function submit(Request $request)
+    public function submit(SubmitComplaintRequest $request)
     {
         if (!Auth::guard('sanctum')->check()) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
+        $request->validated();
 
-        $request->validate([
-            'complaint_type_code' => 'required|exists:complaint_types,code', 
-            'description' => 'required|string|max:1000',
-            'department' => 'sometimes|nullable|string|max:150',
-            'location_address' => 'sometimes|nullable|string|max:255',
-            'latitude' => 'sometimes|nullable|numeric',
-            'longitude' => 'sometimes|nullable|numeric',
-            'attachments' => 'sometimes|array|max:5', 
-            'attachments.*' => 'file|mimes:pdf,jpg,png|max:5000',
-        ]);
+        $userId = Auth::guard('sanctum')->id();
 
-        $userId = Auth::guard('sanctum')->id(); 
 
-        
         $complaint = $this->complaintRepository->createComplaint($userId, $request->all());
 
         return response()->json([
             'message' => 'Complaint submitted successfully.',
-            'id' => $complaint->id,
+            'data' => $complaint,
             'reference_number' => $complaint->reference_number
         ], 201);
+    }
+
+
+
+    public function updateStatus(Request $request,$id)
+    {
+        // 1. التحقق من صحة البيانات (ضمان أن الحالة الجديدة من ضمن الثوابت)
+        $request->validate([
+            'status' => 'required|in:' .
+                Complaint::STATUS_IN_PROCESS . ',' .
+                Complaint::STATUS_COMPLETED . ',' .
+                Complaint::STATUS_REJECTED,
+        ]);
+
+        $complaint = Complaint::findOrFail($id);
+        $complaint->update(['status' => $request->status]);
+
+
+        event(new ComplaintStatusUpdated($complaint));
+
+        return response()->json([
+            'message' => 'Complaint status updated and user notified successfully.',
+            'complaint' => $complaint
+        ]);
+    }
+
+    public function index(){
+
+        $complaint =Complaint::get();
+
+        return response()->json([
+            'data'=>$complaint,
+            'status' =>200,
+            'message'=>'List of complaints'
+        ],200);
     }
 }

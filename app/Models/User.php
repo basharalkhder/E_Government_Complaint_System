@@ -11,7 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory,HasApiTokens, Notifiable;
+    use HasFactory, HasApiTokens, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -22,6 +22,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_verified',
+        'role_id'
     ];
 
     /**
@@ -50,5 +52,16 @@ class User extends Authenticatable
     public function complaints()
     {
         return $this->hasMany(Complaint::class);
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+
+    
+    public function hasRole(string $roleName): bool
+    {
+        return $this->role?->name === $roleName;
     }
 }

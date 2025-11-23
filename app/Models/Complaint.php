@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class Complaint extends Model
 {
 
+    const STATUS_NEW = 'New';
+    const STATUS_IN_PROCESS = 'In Progress';
+    const STATUS_COMPLETED = 'Resolved';
+    const STATUS_REJECTED = 'Rejected';
+
     protected $fillable = [
         'user_id',
         'complaint_type_code',

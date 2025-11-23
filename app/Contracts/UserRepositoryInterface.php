@@ -14,4 +14,22 @@ interface UserRepositoryInterface
     
     // لإصدار التوكن بعد المصادقة الناجحة
     public function createAuthToken(User $user, string $name = 'api_token'): string;
+
+    /**
+     * جلب مستخدم بواسطة المعرف (ID)
+     * @throws ModelNotFoundException
+     */
+    public function find(int $id): ?User;
+
+    /**
+     * التحقق من رمز OTP، وتفعيل المستخدم عند النجاح.
+     */
+    public function verifyOtp(User $user, int $otp): bool;
+
+    /**
+     * توليد رمز OTP، تخزينه في الكاش، وإرساله عبر البريد الإلكتروني.
+     */
+    public function generateAndSendOtp(User $user): void; 
+    
+    // ...
 }
