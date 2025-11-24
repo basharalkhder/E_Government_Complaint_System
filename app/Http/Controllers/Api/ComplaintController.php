@@ -14,18 +14,30 @@ class ComplaintController extends Controller
 {
     protected $complaintRepository;
 
-    // حقن التبعية لطبقة DAO
+    
     public function __construct(ComplaintRepositoryInterface $complaintRepository)
     {
         $this->complaintRepository = $complaintRepository;
     }
 
-    /**
-     * متطلب: جلب بيانات النموذج (يستخدم Caching)
-     */
+
+
+    public function index(){
+
+        $user = Auth::user();
+
+        $Complaint = $user->complaints;
+
+        return response()->json([
+            'data' =>$Complaint,
+            'status'=>200,
+            'message'=>'all Complaints'
+        ],200);
+    }
+    
     public function getFormDependencies()
     {
-        // DAO: جلب البيانات من طبقة الوصول للبيانات (ستأتي من الكاش)
+        
         $types = $this->complaintRepository->getComplaintTypes();
 
         return response()->json([
@@ -78,14 +90,5 @@ class ComplaintController extends Controller
         ]);
     }
 
-    public function index(){
-
-        $complaint =Complaint::get();
-
-        return response()->json([
-            'data'=>$complaint,
-            'status' =>200,
-            'message'=>'List of complaints'
-        ],200);
-    }
+   
 }

@@ -16,11 +16,15 @@ Route::post('login', [AuthController::class, 'login']);
 
 Route::post('verify-otp', [AuthController::class, 'verify']);//التفعيل otp
 
-Route::get('complaints/dependencies', [ComplaintController::class, 'getFormDependencies']);//جلب أنواع الشكاوي
+
 
 Route::middleware(['auth:sanctum', 'role:citizen','verified'])->group(function () {
     
     Route::post('complaints/submit', [ComplaintController::class, 'submit']);//تقديم شكوى
+
+    Route::get('complaints/dependencies', [ComplaintController::class, 'getFormDependencies']);//جلب أنواع الشكاوي
+
+    Route::get('getComplaints',[ComplaintController::class,'index']);//عرض الشكاوي الخاصة بالعميل
 
     Route::post('logout', [AuthController::class, 'logout']);
 });

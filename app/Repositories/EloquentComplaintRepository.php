@@ -30,7 +30,7 @@ class EloquentComplaintRepository implements ComplaintRepositoryInterface
             
         ]);
 
-        // 1. معالجة المرفقات (التحقق من وجود ملفات في الطلب)
+        
         if (isset($data['attachments']) && is_array($data['attachments'])) {
             $this->saveAttachments($complaint, $data['attachments']);
         }
