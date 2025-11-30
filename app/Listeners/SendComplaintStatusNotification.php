@@ -6,6 +6,10 @@ use App\Events\ComplaintStatusUpdated;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use App\Notifications\ComplaintStatusNotification; 
+use Illuminate\Support\Facades\Log;
+use App\Notifications\RequestInfoNotification;
+
+use App\Models\Complaint;
 
 class SendComplaintStatusNotification 
 {
@@ -22,13 +26,40 @@ class SendComplaintStatusNotification
      */
     public function handle(ComplaintStatusUpdated $event): void
     {
-        $user = $event->complaint->user;
+        $complaint = $event->complaint;
+        $user = $complaint->user;
 
-        if ($user && $user->email) {
-            $user->notify(new ComplaintStatusNotification($event->complaint));
-        } else {
-           
-            \Illuminate\Support\Facades\Log::error('Notification failed: User or email not found for complaint ID: ' . $event->complaint->id);
+        // 1. التحقق الأساسي
+        if (!$user || !$user->email) {
+            Log::error('Notification failed: User or email not found for complaint ID: ' . $complaint->id);
+            return;
+        }
+
+        // 2. اختيار الإشعار المناسب بناءً على حالة الشكوى
+        $notification = null;
+        
+        switch ($complaint->status) {
+            case Complaint::STATUS_REQUESTED_INFO:
+                // عند طلب معلومات، نستخدم الإشعار الخاص الذي يعرض ملاحظات الإدارة
+                $notification = new RequestInfoNotification($complaint);
+                break;
+
+            case Complaint::STATUS_COMPLETED:
+            case Complaint::STATUS_REJECTED:
+            case Complaint::STATUS_IN_PROCESS:
+                // للحالات الأخرى، نستخدم الإشعار العام
+                $notification = new ComplaintStatusNotification($complaint);
+                break;
+
+            default:
+                // لا نفعل شيئاً للحالات التي لا تتطلب إشعاراً فورياً
+                return;
+        }
+
+        // 3. إرسال الإشعار
+        if ($notification) {
+            $user->notify($notification);
         }
     }
-}
+    }
+

@@ -17,6 +17,8 @@ return new class extends Migration
             // المفتاح الخارجي للمستخدم (ORM وعلاقة BelongsTo)
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
 
+            $table->foreignId('entity_id')->nullable()->constrained('entities');
+
             // الرمز الداخلي لنوع الشكوى (لربط الشكوى بنوعها)
             $table->string('complaint_type_code', 20);
             $table->foreign('complaint_type_code')
@@ -29,8 +31,10 @@ return new class extends Migration
                 'New',          // جديدة
                 'In Progress',  // قيد المعالجة
                 'Resolved',     // منجزة
-                'Rejected'      // مرفوضة
+                'Rejected',   // مرفوضة
+                'Requested Info'
             ])->default('New');
+            $table->text('admin_notes')->nullable();
             $table->timestamps();
         });
     }

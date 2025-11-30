@@ -30,7 +30,7 @@ class EloquentUserRepository implements UserRepositoryInterface
 
     public function find(int $id): ?User
     {
-        // ORM: استخدام Eloquent لـ find
+        
         return User::find($id);
     }
 
@@ -68,5 +68,19 @@ class EloquentUserRepository implements UserRepositoryInterface
         }
 
         return false;
+    }
+
+    public function updateVerificationStatus(User $user, bool $status): bool
+    {
+      
+        $user->is_verified = $status;
+        
+        if ($status === true) {
+            $user->email_verified_at = now();
+        } else {
+            $user->email_verified_at = null;
+        }
+        
+        return $user->save();
     }
 }

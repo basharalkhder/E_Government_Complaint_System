@@ -11,13 +11,13 @@ class AdminAuthController extends Controller
 {
     public function login(Request $request)
     {
-        // 1. التحقق من البيانات
+        
         $credentials = $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        // 2. محاولة المصادقة (Authentication)
+        
         if (!Auth::attempt($credentials)) {
             return response()->json(['message' => 'Invalid email or password.'], 401);
         }

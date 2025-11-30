@@ -23,7 +23,8 @@ class User extends Authenticatable
         'email',
         'password',
         'is_verified',
-        'role_id'
+        'role_id',
+        'entity_id'
     ];
 
     /**
@@ -63,5 +64,15 @@ class User extends Authenticatable
     public function hasRole(string $roleName): bool
     {
         return $this->role?->name === $roleName;
+    }
+
+    public function entity()
+    {
+        return $this->belongsTo(Entity::class, 'entity_id');
+    }
+
+    public function isEmployee(): bool
+    {
+        return $this->role === 'employee' && $this->entity_id !== null;
     }
 }

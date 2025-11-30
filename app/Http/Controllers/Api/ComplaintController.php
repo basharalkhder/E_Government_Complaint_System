@@ -2,43 +2,44 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Contracts\ComplaintRepositoryInterface;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Http\Requests\SubmitComplaintRequest;
+use Illuminate\Auth\Access\AuthorizationException;
 use App\Models\Complaint;
 use App\Events\ComplaintStatusUpdated;
 use Illuminate\Support\Facades\Auth;
+use App\Services\ComplaintService;
+use App\Http\Requests\UpdateComplaintStatusRequest;
 
 class ComplaintController extends Controller
 {
-    protected $complaintRepository;
+   protected $complaintService;
 
     
-    public function __construct(ComplaintRepositoryInterface $complaintRepository)
+    public function __construct(ComplaintService $complaintService)
     {
-        $this->complaintRepository = $complaintRepository;
+        $this->complaintService = $complaintService;
     }
 
 
+    public function index()
+    {
 
-    public function index(){
-
-        $user = Auth::user();
-
-        $Complaint = $user->complaints;
+        $complaints = $this->complaintService->getUserComplaints();
 
         return response()->json([
-            'data' =>$Complaint,
-            'status'=>200,
-            'message'=>'all Complaints'
-        ],200);
+            'data' => $complaints,
+            'status' => 200,
+            'message' => 'all Complaints'
+        ], 200);
     }
-    
+
     public function getFormDependencies()
     {
-        
-        $types = $this->complaintRepository->getComplaintTypes();
+
+        $types = $this->complaintService->getComplaintTypes();
 
         return response()->json([
             'complaint_types' => $types
@@ -57,7 +58,7 @@ class ComplaintController extends Controller
         $userId = Auth::guard('sanctum')->id();
 
 
-        $complaint = $this->complaintRepository->createComplaint($userId, $request->all());
+        $complaint = $this->complaintService->createComplaint($userId, $request->all());
 
         return response()->json([
             'message' => 'Complaint submitted successfully.',
@@ -68,27 +69,42 @@ class ComplaintController extends Controller
 
 
 
-    public function updateStatus(Request $request,$id)
+    public function updateStatus(UpdateComplaintStatusRequest $request , $id)
     {
-        // 1. التحقق من صحة البيانات (ضمان أن الحالة الجديدة من ضمن الثوابت)
-        $request->validate([
-            'status' => 'required|in:' .
-                Complaint::STATUS_IN_PROCESS . ',' .
-                Complaint::STATUS_COMPLETED . ',' .
-                Complaint::STATUS_REJECTED,
-        ]);
+        $request->validated();
+        
+        $user = Auth::user();
 
-        $complaint = Complaint::findOrFail($id);
-        $complaint->update(['status' => $request->status]);
+        try {
+            
+            $complaint = $this->complaintService->updateComplaintStatus(
+                $id,
+                $request->only(['status', 'admin_notes']), 
+                $user->entity_id 
+            );
 
+            return response()->json([
+                'message' => 'Complaint updated successfully.',
+                'complaint' => $complaint
+            ]);
 
-        event(new ComplaintStatusUpdated($complaint));
+        } catch (AuthorizationException $e) {
+           
+            return response()->json([
+                'message' => $e->getMessage()
+            ], 403);
+            
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'message' => 'Complaint not found.'
+            ], 404);
 
-        return response()->json([
-            'message' => 'Complaint status updated and user notified successfully.',
-            'complaint' => $complaint
-        ]);
+        } catch (\Exception $e) {
+            
+            return response()->json([
+                'message' => 'An unexpected error occurred.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
-
-   
 }

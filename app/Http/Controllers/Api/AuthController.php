@@ -2,88 +2,69 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Contracts\UserRepositoryInterface;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
-use App\Models\Role;
+use App\Http\Requests\Citizen\RegisterRequest;
+use App\Http\Requests\Citizen\LoginRequest;
+use App\Http\Resources\Citizen\RegisterResource;
+use App\Http\Resources\Citizen\LoginResource;
+use App\Services\UserService;
+use App\Exceptions\ResendVerificationException;
 
 class AuthController extends Controller
 {
-    protected $userRepository;
+    protected $userService;
 
-
-    public function __construct(UserRepositoryInterface $userRepository)
+    public function __construct(UserService $userService)
     {
-        $this->userRepository = $userRepository;
+
+        $this->userService = $userService;
     }
 
 
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
 
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|unique:users,email',
-            'password' => 'required|string|min:8',
-        ]);
+        $userData = $request->validated();
 
-        $citizenRole = Role::where('name', 'citizen')->first();
+        try {
+            $user = $this->userService->registerNewUser($userData);
+            return response_success(new RegisterResource($user), 201, 'The registration was completed and the OTP code was sent to the email');
+        } catch (ResendVerificationException $e) {
 
-        if (!$citizenRole) {
-
-            return response()->json(['message' => 'System error: Citizen role configuration missing.'], 500);
+            return response_success(null, 200, $e->getMessage());
+        } catch (\Exception $e) {
+            return response_error(null, 400, $e->getMessage());
         }
-
-        $userData = array_merge($request->all(), [
-            'role_id' => $citizenRole->id,
-        ]);
-
-        $user = $this->userRepository->create($userData);
-
-        $verificationToken = Str::random(60);
-
-        Cache::put($verificationToken, $user->id, now()->addMinutes(15));
-
-        $this->userRepository->generateAndSendOtp($user);
-
-
-
-        return response()->json([
-            'message' => 'User registered successfully. An OTP will be sent for verification.',
-            'user' => $user->only(['id', 'name', 'email'])
-        ], 201);
     }
 
 
-    public function login(Request $request)
+
+    public function login(LoginRequest $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        $request->validated();
 
+        try {
+            $authData = $this->userService->authenticate(
+                $request->email,
+                $request->password
+            );
 
-        $user = $this->userRepository->findByEmail($request->email);
+            $user = $authData['user'];
+            $token = $authData['token'];
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
-
-
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
+            return response_success(new LoginResource($user, $token), 200, 'Login successful');
+        } catch (\App\Exceptions\AccountNotFoundException $e) { 
+            return response_error(Null, 404, $e->getMessage());
+        } catch (\App\Exceptions\AccountNotVerifiedException $e) { 
+            return response_error(Null, 403, $e->getMessage());
+        } catch (\Illuminate\Validation\ValidationException $e) { 
+            return response_error(Null, 401, 'Invalid email or password.');
+        } catch (\Exception $e) {
+            return response_error(Null, 500, 'An unexpected error occurred during login.');
         }
-
-        $token = $this->userRepository->createAuthToken($user);
-
-        return response()->json([
-            'message' => 'Login successful',
-            'token' => $token,
-            'user' => $user->only(['id', 'name', 'email'])
-        ]);
     }
 
 
@@ -101,25 +82,23 @@ class AuthController extends Controller
     {
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            'otp' => 'required|digits:6', 
+            'otp' => 'required|digits:6',
         ]);
 
-        $user = $this->userRepository->find($request->user_id); 
+        try {
 
-        if (!$user) {
-            throw ValidationException::withMessages(['user_id' => ['User not found.']]);
-        }
-
-        if ($this->userRepository->verifyOtp($user, $request->otp)) {
-            $token = $this->userRepository->createAuthToken($user);
+            $authData = $this->userService->verifyUserAndGenerateToken(
+                $request->user_id,
+                $request->otp
+            );
 
             return response()->json([
                 'message' => 'Account successfully verified.',
-                'token' => $token,
-                'user' => $user->only(['id', 'name', 'email'])
+                'token' => $authData['token'],
+                'user' => $authData['user']->only(['id', 'name', 'email'])
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         }
-
-        throw ValidationException::withMessages(['otp' => ['Invalid or expired verification code.']]);
     }
 }

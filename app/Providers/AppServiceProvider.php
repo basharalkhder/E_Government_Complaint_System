@@ -36,13 +36,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // 💡 1. الاستماع لحدث التحديث في نموذج الشكوى
+       
         Complaint::updated(function (Complaint $complaint) {
 
-            // 💡 2. التحقق من أن حقل 'status' قد تغير بالفعل
+           
             if ($complaint->isDirty('status')) {
 
-                // 💡 3. إطلاق الحدث الذي سينبه الـ Listener
                 event(new ComplaintStatusUpdated($complaint));
             }
         });
