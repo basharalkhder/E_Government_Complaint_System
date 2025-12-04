@@ -4,8 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+
 class Complaint extends Model
 {
+
+    protected $casts = [
+        'is_locked' => 'boolean',
+        'locked_at' => 'datetime',
+    ];
 
     const STATUS_NEW = 'New';
     const STATUS_IN_PROCESS = 'In Progress';
@@ -25,7 +31,10 @@ class Complaint extends Model
         'latitude',
         'longitude',
         'reference_number',
-        'admin_notes'
+        'admin_notes',
+        'is_locked',
+        'locked_by_user_id',
+        'locked_at'
     ];
 
     public function entity()
@@ -48,5 +57,10 @@ class Complaint extends Model
     public function attachments()
     {
         return $this->hasMany(ComplaintAttachment::class);
+    }
+
+    public function histories()
+    {
+        return $this->hasMany(ComplaintHistory::class, 'complaint_id');
     }
 }

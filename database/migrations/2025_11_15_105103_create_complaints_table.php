@@ -35,6 +35,16 @@ return new class extends Migration
                 'Requested Info'
             ])->default('New');
             $table->text('admin_notes')->nullable();
+
+            $table->boolean('is_locked')->default(false);;
+            
+            $table->foreignId('locked_by_user_id')
+                  ->nullable() 
+                  ->constrained('users')
+                  ->onDelete('set null');
+
+            // 3. وقت الحجز (لتنفيذ آلية انتهاء المهلة الزمنية)
+            $table->timestamp('locked_at')->nullable();
             $table->timestamps();
         });
     }

@@ -31,6 +31,8 @@ Route::middleware(['auth:sanctum', 'role:citizen', 'verified'])->group(function 
     //done
     Route::post('complaints/submit', [ComplaintController::class, 'submit']); //تقديم شكوى
 
+    Route::post('{complaint_id}/update-by-user', [ComplaintController::class, 'updateByUser']);//تحديث الشكوى 
+
     //done
     Route::get('complaints/dependencies', [ComplaintController::class, 'getFormDependencies']); //جلب أنواع الشكاوي
 
@@ -42,6 +44,9 @@ Route::middleware(['auth:sanctum', 'role:citizen', 'verified'])->group(function 
 
 
 Route::middleware(['auth:sanctum', 'role:employee'])->group(function () {
+
+    Route::post('{complaint}/lock', [ComplaintController::class, 'lockComplaint']);
+
 
     //done
     Route::post('employee/complaints/{complaint_id}/status', [ComplaintController::class, 'updateStatus']); //تحديث حالة الشكوى
@@ -71,6 +76,8 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
     // مسار تصدير التقارير (CSV,pdf)
     Route::get('complaints/export', [AdminComplaintController::class, 'exportReports']);//done
+
+    Route::get('complaint/{complaint_id}', [AdminComplaintController::class, 'show']);//عرض كل شكوى والسجل الزمني الخاص بها
 
 });
 
