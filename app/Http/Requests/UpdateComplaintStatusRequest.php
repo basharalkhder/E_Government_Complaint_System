@@ -2,8 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ComplaintStatus; 
 use Illuminate\Foundation\Http\FormRequest;
-use App\Models\Complaint;
+use Illuminate\Validation\Rules\Enum;
 
 class UpdateComplaintStatusRequest extends FormRequest
 {
@@ -22,26 +23,21 @@ class UpdateComplaintStatusRequest extends FormRequest
      */
     public function rules(): array
     {
-        // استخدام ثوابت الموديل لضمان أن القيم صالحة
-        $allowedStatuses = implode(',', [
-            Complaint::STATUS_IN_PROCESS,
-            Complaint::STATUS_COMPLETED,
-            Complaint::STATUS_REJECTED,
-            Complaint::STATUS_REQUESTED_INFO,
-        ]);
+        
 
         return [
-            'status' => 'required|in:' . $allowedStatuses,
-            'admin_notes' => 'nullable|string',
+            'status' => ['required', new Enum(ComplaintStatus::class)],
+            'admin_notes' => 'nullable|string|max:1000',
         ];
     }
 
     public function messages(): array
     {
-        return [
-            'status.required' => 'حالة الشكوى مطلوبة.',
-            'status.in' => 'حالة الشكوى غير صالحة.',
-            'admin_notes.string' => 'ملاحظات الإدارة يجب أن تكون نصاً.',
-        ];
+       return [
+        'status.required' => 'The complaint status field is required.',
+        'status.Illuminate\Validation\Rules\Enum' => 'The selected status is invalid. Please provide a valid complaint status.',
+        'admin_notes.string' => 'Administrative notes must be a valid string.',
+        'admin_notes.max' => 'Administrative notes may not be greater than 1000 characters.',
+    ];
     }
 }

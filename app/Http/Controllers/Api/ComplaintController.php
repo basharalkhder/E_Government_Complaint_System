@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers\Api;
 
-
+use App\Enums\ComplaintStatus;
 use Carbon\Carbon;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Http\Requests\SubmitComplaintRequest;
 use Illuminate\Auth\Access\AuthorizationException;
 use App\Models\Complaint;
-use App\Events\ComplaintStatusUpdated;
 use Illuminate\Support\Facades\Auth;
 use App\Services\ComplaintService;
 use App\Http\Requests\UpdateComplaintStatusRequest;
 use Illuminate\Validation\ValidationException;
+use App\Http\Resources\CreateComplaintResource;
+use App\Http\Resources\UpdateStatusComplaintResource;
+use App\Http\Resources\ComplaintTypeResource;
+use App\Http\Resources\ComplaintUserResource;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ComplaintController extends Controller
 {
@@ -31,11 +35,7 @@ class ComplaintController extends Controller
 
         $complaints = $this->complaintService->getUserComplaints();
 
-        return response()->json([
-            'data' => $complaints,
-            'status' => 200,
-            'message' => 'all Complaints'
-        ], 200);
+        return response_success(ComplaintUserResource::collection($complaints), 200, 'all Complaints');
     }
 
     public function getFormDependencies()
@@ -43,42 +43,22 @@ class ComplaintController extends Controller
 
         $types = $this->complaintService->getComplaintTypes();
 
-        return response()->json([
-            'complaint_types' => $types
-        ]);
+        return response_success(ComplaintTypeResource::collection($types), 200, 'All Types Complaints');
     }
 
 
     public function submit(SubmitComplaintRequest $request)
     {
-        if (!Auth::guard('sanctum')->check()) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
+
 
         $data = $request->validated();
 
         $userId = Auth::guard('sanctum')->id();
 
-        // 1. التحقق من التكرار (المنع الزمني)
-        $recentComplaint = Complaint::where('user_id', $userId)
-            ->where('complaint_type_code', $data['complaint_type_code'])
-            ->whereIn('status', ['New', 'In Progress', 'Requested Info']) // الحالات النشطة
-            ->where('created_at', '>', Carbon::now()->subDays(30)) // خلال آخر 30 يوماً
-            ->exists();
+        $complaint = $this->complaintService->handleComplaintSubmission($userId, $data);
 
-        if ($recentComplaint) {
-            throw ValidationException::withMessages([
-                'complaint_type_code' => 'لديك شكوى نشطة بنفس الموضوع مقدمة مؤخراً. يرجى متابعة الشكوى الحالية.'
-            ]);
-        }
 
-        $complaint = $this->complaintService->createComplaint($userId, $request->all());
-
-        return response()->json([
-            'message' => 'Complaint submitted successfully.',
-            'data' => $complaint,
-            'reference_number' => $complaint->reference_number
-        ], 201);
+        return response_success(new CreateComplaintResource($complaint), 201, 'Complaint submitted successfully.');
     }
 
 
@@ -97,10 +77,7 @@ class ComplaintController extends Controller
                 $user->entity_id
             );
 
-            return response()->json([
-                'message' => 'Complaint updated successfully.',
-                'complaint' => $complaint
-            ]);
+            return response_success(new UpdateStatusComplaintResource($complaint), 200, 'Complaint updated successfully.');
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => $e->getMessage()
@@ -116,37 +93,12 @@ class ComplaintController extends Controller
             ], 404);
         } catch (\Exception $e) {
 
-            return response()->json([
-                'message' => 'An unexpected error occurred.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-
-
-
-
-
-    public function lockComplaint(Complaint $complaint)
-    {
-        $currentUserId = Auth::id();
-
-        if ($complaint->entity_id !== Auth::user()->entity_id) {
-            return response()->json(['message' => 'Unauthorized. This complaint does not belong to your entity.'], 403);
-        }
-
-        try {
-            $this->complaintService->acquireLock($complaint);
+            $status = ($e->getMessage() === 'This complaint status has already been updated by another employee.') ? 409 : 500;
 
             return response()->json([
-                'message' => 'Complaint successfully locked for editing.',
-                'locker' => Auth::user()->name,
-                'locked_at' => $complaint->locked_at
-            ], 200);
-        } catch (ValidationException $e) {
-            $errorMessage = collect($e->errors())->flatten()->first();
-            return response()->json(['message' => $errorMessage], 403);
+                'message' => $e->getMessage(),
+                'error' => 'Concurrency Error'
+            ],  $status);
         }
     }
 
@@ -154,43 +106,30 @@ class ComplaintController extends Controller
 
     public function updateByUser(Request $request, $id)
     {
-        $user = Auth::user();
-        $complaint = Complaint::findOrFail($id);
-
-        if ($complaint->user_id !== $user->id) {
-            throw new AuthorizationException('غير مصرح لك بتعديل هذه الشكوى.');
-        }
-
-
-        if ($complaint->status !== 'Requested Info') {
-            throw ValidationException::withMessages([
-                'status' => 'لا يمكن تعديل الشكوى إلا في حالة "Requested Info".'
-            ]);
-        }
-
-        $data =  $request->validate([
+        // 1. Validation
+        $data = $request->validate([
             'description' => 'sometimes|string|max:1000',
             'attachments' => 'nullable|array',
             'attachments.*' => 'file|mimes:pdf,jpg,png|max:5120',
         ]);
 
         try {
-            $updatedComplaint = $this->complaintService->updateComplaintByUser(
-                $complaint,
+            // 2. Business Logic Execution via Service
+            $complaint = $this->complaintService->processUserUpdate(
+                $id,
+                Auth::id(),
                 $data,
-                $user->id
+                $request->file('attachments')
             );
 
-            if ($request->hasFile('attachments')) {
-                $this->complaintService->addAttachmentsinhistory($updatedComplaint, $request->file('attachments'), $user->id);
-            }
-
-            return response()->json([
-                'message' => 'تم تحديث الشكوى والمرفقات بنجاح.',
-                'complaint' => $updatedComplaint
-            ], 200);
+            return response_success(new CreateComplaintResource($complaint), 200, 'Complaint updated successfully.');
+        } catch (ModelNotFoundException $e) {
+            return response_error(Null, 404, 'Complaint Not Found');
         } catch (\Exception $e) {
-            throw $e;
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ], $e->getCode() ?: 400);
         }
     }
 }

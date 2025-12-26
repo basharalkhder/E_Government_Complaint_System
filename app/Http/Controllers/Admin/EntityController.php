@@ -3,19 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Entity;
-use App\Models\User;
-use App\Models\ComplaintType;
-use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Hash;
 use App\Services\EntityManagementService;
 use App\Http\Requests\Admin\StoreEntityRequest;
-use App\Http\Requests\Admin\StoreEmployeeRequest;
-use App\Http\Requests\Admin\StoreComplaintTypeRequest;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Http\Requests\Admin\UpdateEntityRequest;
 
+use App\Http\Resources\StoreEntityResource;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class EntityController extends Controller
 {
@@ -27,6 +20,21 @@ class EntityController extends Controller
         $this->entityManagementService = $entityManagementService;
     }
 
+    public function index()
+    {
+        $entities = $this->entityManagementService->get_all_entity();
+
+        return response_success(StoreEntityResource::collection($entities), 200, 'all entites');
+    }
+
+    public function show($id){
+        try{
+        $entity = $this->entityManagementService->getEntityById($id);
+        return response_success(new StoreEntityResource($entity),200);
+        }catch(ModelNotFoundException $e) {
+            return response_error(null, 404, 'Entity Not Found');
+        }
+    }
 
 
     public function store(StoreEntityRequest $request)
@@ -34,11 +42,7 @@ class EntityController extends Controller
         try {
             $entity = $this->entityManagementService->createEntity($request->all());
 
-            // 3. إرجاع استجابة النجاح
-            return response()->json([
-                'message' => 'Entity created successfully.',
-                'data' => $entity
-            ], 201);
+            return response_success(new StoreEntityResource($entity), 201, 'Entity created successfully.');
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Failed to create entity.',
@@ -48,38 +52,33 @@ class EntityController extends Controller
     }
 
 
-    public function storeEmployee(StoreEmployeeRequest $request)
+    public function update(UpdateEntityRequest $request, $id)
+    {
+
+        $data = $request->validated();
+
+        try {
+            $entity = $this->entityManagementService->updateEntity($id, $data);
+
+            return response_success(new StoreEntityResource($entity), 200, 'Entity Updated Successfully');
+        } catch (ModelNotFoundException $e) {
+            return response_error(null, 404, 'Entity Not Found');
+        }
+    }
+
+    public function delete_Entity($id)
     {
         try {
-            $employee = $this->entityManagementService->createEmployee($request->all());
-
-            return response()->json([
-                'message' => 'Employee account created and assigned successfully.',
-                'data' => ['user' => $employee]
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create employee account.',
-                'error' => $e->getMessage()
-            ], 500);
+            $this->entityManagementService->deleteEntity($id);
+            return response_success(null, 200, 'Entity deleted successfully');
+        } catch (ModelNotFoundException $e) {
+            return response_error(null, 404, 'Entity Not Found');
         }
     }
 
 
-    function storeComplaintType(StoreComplaintTypeRequest $request)
-    {
-        try {
-            $complaintType = $this->entityManagementService->createComplaintType($request->all());
 
-            return response()->json([
-                'message' => 'Complaint type created and successfully linked to the entity.',
-                'data' => $complaintType
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to create complaint type.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+   
+
+
 }

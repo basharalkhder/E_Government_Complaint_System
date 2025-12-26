@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\GlobalTracing;
 
 class ComplaintHistory extends Model
 {
+    use GlobalTracing;
+    
     protected $fillable = [
         'complaint_id',      // ربط الشكوى
         'user_id',           // المستخدم الذي قام بالإجراء

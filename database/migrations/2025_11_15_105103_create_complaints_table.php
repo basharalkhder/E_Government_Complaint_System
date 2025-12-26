@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use App\Enums\ComplaintStatus;
 
 return new class extends Migration
 {
@@ -13,7 +14,7 @@ return new class extends Migration
     {
         Schema::create('complaints', function (Blueprint $table) {
             $table->id();
-            
+
             // المفتاح الخارجي للمستخدم (ORM وعلاقة BelongsTo)
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
 
@@ -27,24 +28,11 @@ return new class extends Migration
 
             $table->string('department', 150);
             $table->text('description');
-            $table->enum('status', [
-                'New',          // جديدة
-                'In Progress',  // قيد المعالجة
-                'Resolved',     // منجزة
-                'Rejected',   // مرفوضة
-                'Requested Info'
-            ])->default('New');
+            $table->enum('status', array_column(ComplaintStatus::cases(), 'value'))
+                ->default(ComplaintStatus::NEW->value);
             $table->text('admin_notes')->nullable();
 
-            $table->boolean('is_locked')->default(false);;
             
-            $table->foreignId('locked_by_user_id')
-                  ->nullable() 
-                  ->constrained('users')
-                  ->onDelete('set null');
-
-            // 3. وقت الحجز (لتنفيذ آلية انتهاء المهلة الزمنية)
-            $table->timestamp('locked_at')->nullable();
             $table->timestamps();
         });
     }

@@ -26,10 +26,7 @@ class ComplaintResource extends JsonResource
             'owner' => UserResource::make($this->whenLoaded('user')),
 
             
-            'entity' => $this->whenLoaded('entity', function () {
-                return $this->entity->name;
-            }),
-
+            'entity' => EntityResource::make($this->whenLoaded('entity')),
             
             'attachments' => $this->whenLoaded('attachments', function () {
               

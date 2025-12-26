@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Traits\GlobalTracing;
 
 class User extends Authenticatable
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+
+    use GlobalTracing;
+    
     use HasFactory, HasApiTokens, Notifiable;
 
     /**
@@ -22,9 +25,15 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_active',
         'is_verified',
         'role_id',
-        'entity_id'
+        'entity_id',
+    ];
+
+    protected $casts = [
+        'is_active' =>'boolean',
+        'is_verified' =>'boolean'
     ];
 
     /**
@@ -60,7 +69,7 @@ class User extends Authenticatable
         return $this->belongsTo(Role::class);
     }
 
-    
+
     public function hasRole(string $roleName): bool
     {
         return $this->role?->name === $roleName;
@@ -74,5 +83,22 @@ class User extends Authenticatable
     public function isEmployee(): bool
     {
         return $this->role === 'employee' && $this->entity_id !== null;
+    }
+
+
+
+    protected static function booted()
+    {
+        $clearCitizenCache = function ($user) {
+        
+            if ($user->role_id == 3) {
+                \Illuminate\Support\Facades\Cache::forget('admin_citizens_list');
+            }
+        };
+
+        static::saved($clearCitizenCache);
+
+        static::deleted($clearCitizenCache);
+
     }
 }

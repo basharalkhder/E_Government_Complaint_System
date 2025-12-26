@@ -19,10 +19,10 @@ class GetComplaintsResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'reference_number' => $this->reference_number, // سهل الوصول إليه
-            'status' => $this->status,
+            'reference_number' => $this->reference_number,
+            'status' => $this->status->value,
             'type_code' => $this->complaint_type_code,
-            'department' => $this->department,
+            'department' => $this->department ?? 'null',
             'description' => $this->description,
 
             'location' => [

@@ -45,4 +45,6 @@ class EntityComplaintController extends Controller
             return response_error(NULL, 500, 'An internal error occurred while retrieving complaints.');
         }
     }
+
+    
 }

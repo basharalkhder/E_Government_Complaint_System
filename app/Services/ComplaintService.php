@@ -14,100 +14,77 @@ use Illuminate\Support\Facades\Storage;
 use App\Events\ComplaintStatusUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Carbon\Carbon;
+use App\Enums\ComplaintStatus;
+use Exception;
 
 class ComplaintService
 {
-
-    const LOCK_TIMEOUT_MINUTES = 15;
-
-    public function acquireLock(Complaint $complaint): void
-    {
-        $currentUserId = Auth::id();
-
-        if ($complaint->is_locked) {
-
-
-            $lockedAt = $complaint->locked_at;
-            $isTimedOut = $lockedAt && $lockedAt->addMinutes(self::LOCK_TIMEOUT_MINUTES)->isPast();
-
-
-            if ($isTimedOut) {
-                $this->releaseLock($complaint);
-            } elseif ($complaint->locked_by_user_id !== $currentUserId) {
-
-                $lockerName =  Auth::user()->name ?? 'موظف آخر';
-                throw ValidationException::withMessages([
-                    'lock' => "الشكوى محجوزة حالياً وقيد المعالجة من قبل {$lockerName}."
-                ]);
-            }
-        }
-
-        $complaint->update([
-            'is_locked' => true,
-            'locked_by_user_id' => $currentUserId,
-            'locked_at' => Carbon::now(),
-        ]);
-    }
-
-
-    public function releaseLock(Complaint $complaint): void
-    {
-        // نحرر القفل فقط إذا كان حائزه هو المستخدم الحالي (أو إذا كان القفل منتهي الصلاحية وتم تحريره في acquireLock)
-        if ($complaint->locked_by_user_id === Auth::id() || $complaint->is_locked === true) {
-            $complaint->update([
-                'is_locked' => false,
-                'locked_by_user_id' => null,
-                'locked_at' => null,
-            ]);
-        }
-    }
-
 
 
 
     public function getUserComplaints()
     {
         $user = Auth::user();
-        return $user->complaints;
+        $complaints = $user->complaints()->with('entity')->get();
+        return $complaints;
     }
 
 
-    public function createComplaint(int $userId, array $data): Complaint
+    public function handleComplaintSubmission(int $userId, array $data): Complaint
     {
+
+        $this->ensureNoRecentDuplicate($userId, $data['complaint_type_code']);
+
 
         $entityId = $this->determineResponsibleEntityId($data['complaint_type_code']);
 
-        $referenceNumber = 'COMP-' . Str::upper(Str::random(8));
+
+        $referenceNumber = 'COMP-' . date('Ymd') . '-' . Str::upper(Str::random(4));
 
         $complaint = Complaint::create([
-            'user_id' => $userId,
+            'user_id'          => $userId,
             'complaint_type_code' => $data['complaint_type_code'],
-            'entity_id' => $entityId,
-            'department' => $data['department'] ?? 'غير محدد',
-            'description' => $data['description'],
+            'entity_id'        => $entityId,
+            'department'       => $data['department'] ?? 'غير محدد',
+            'description'      => $data['description'],
             'location_address' => $data['location_address'] ?? null,
-            'latitude' => $data['latitude'] ?? null,
-            'longitude' => $data['longitude'] ?? null,
+            'latitude'         => $data['latitude'] ?? null,
+            'longitude'        => $data['longitude'] ?? null,
             'reference_number' => $referenceNumber,
-            'status' => 'New',
-
+            'status'           => 'New',
         ]);
-
 
         if (isset($data['attachments']) && is_array($data['attachments'])) {
             $this->saveAttachments($complaint, $data['attachments'], $userId);
         }
+
+        $complaint->load(['entity', 'attachments', 'user']);
+
         return $complaint;
+    }
+
+    protected function ensureNoRecentDuplicate(int $userId, string $typeCode): void
+    {
+        $exists = Complaint::where('user_id', $userId)
+            ->where('complaint_type_code', $typeCode)
+            ->whereIn('status', ['New', 'In Progress', 'Requested Info'])
+            ->where('created_at', '>', now()->subDays(30))
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'complaint_type_code' => 'You have a recently submitted active complaint regarding the same issue. Please follow up on your existing complaint.'
+            ]);
+        }
     }
 
     protected function determineResponsibleEntityId(string $complaintTypeCode): ?int
     {
         $complaintType = ComplaintType::where('code', $complaintTypeCode)
-            // نختار فقط entity_id لتقليل حجم الاستعلام
+
             ->first(['entity_id']);
 
-        // إذا وُجد نوع الشكوى، نُرجع الـ entity_id، وإلا نُرجع NULL
+
         return $complaintType->entity_id ?? null;
     }
 
@@ -139,34 +116,44 @@ class ComplaintService
     public function getComplaintTypes(): Collection
     {
 
+
         return Cache::remember('all_complaint_types', 3600, function () {
 
-            return ComplaintType::all();
+            return ComplaintType::with('entity')->get();
         });
     }
 
 
     public function updateComplaintStatus(int $complaintId, array $data, int $entityId): Complaint
     {
-
         return DB::transaction(function () use ($complaintId, $data, $entityId) {
 
+            
+            $complaint = Complaint::lockForUpdate()->findOrFail($complaintId);
 
-            $complaint = Complaint::findOrFail($complaintId);
 
-            // تسجيل تغيير الحالة
-            if (isset($data['status']) && $complaint->status !== $data['status']) {
+           
+            
+            if ($complaint->entity_id !== $entityId) {
+                throw new AuthorizationException('Unauthorized. This complaint does not belong to your entity.');
+            }
+
+            if (isset($data['status']) && $complaint->status->value === $data['status']) {
+                throw new \Exception('This complaint status has already been updated by another employee.');
+            }
+
+            
+            if (isset($data['status']) && $complaint->status->value !== $data['status']) {
                 $complaint->histories()->create([
                     'user_id' => Auth::id(),
                     'action_type' => 'STATUS_CHANGE',
                     'field_name' => 'status',
-                    'old_value' => $complaint->status,
+                    'old_value' => $complaint->status->value,
                     'new_value' => $data['status'],
-                    'comment' => "تغيير الحالة من {$complaint->status} إلى {$data['status']}",
+                    'comment' => "Status updated from {$complaint->status->value} to {$data['status']}",
                 ]);
             }
 
-            // تسجيل إضافة/تعديل الملاحظات الإدارية
             if (isset($data['admin_notes']) && $complaint->admin_notes !== $data['admin_notes']) {
                 $complaint->histories()->create([
                     'user_id' => Auth::id(),
@@ -174,114 +161,115 @@ class ComplaintService
                     'field_name' => 'admin_notes',
                     'old_value' => $complaint->admin_notes,
                     'new_value' => $data['admin_notes'],
-                    'comment' => "تم إضافة/تعديل ملاحظة إدارية.",
+                    'comment' => "Administrative notes have been modified."
                 ]);
             }
 
+            // 5. تحديث البيانات
+            $updateData = [
+                'status' => $data['status'],
+                'admin_notes' => $data['admin_notes'] ?? $complaint->admin_notes,
+            ];
 
+            $complaint->update($updateData);
 
-            // التأكد من أن الشكوى تخص الجهة التي يعمل بها الموظف
-            if ($complaint->entity_id !== $entityId) {
-                // إلقاء استثناء (Exception) بدلاً من إرجاع Response
-                throw new AuthorizationException('Unauthorized. This complaint does not belong to your entity.');
-            }
-
-            $this->acquireLock($complaint);
-
-            try {
-                $updateData = [
-                    'status' => $data['status'],
-                    'admin_notes' => $data['admin_notes'] ?? null,
-                ];
-
-                $complaint->update($updateData);
-
-
-                event(new ComplaintStatusUpdated($complaint));
-            } catch (\Exception $e) {
-                $this->releaseLock($complaint);
-                throw $e;
-            }
-
-            $this->releaseLock($complaint);
+            
+            event(new ComplaintStatusUpdated($complaint));
 
             return $complaint;
+        }); 
+    }
+
+
+    public function processUserUpdate(int $id, int $userId, array $data, ?array $files)
+    {
+        return DB::transaction(function () use ($id, $userId, $data, $files) {
+            
+            
+            $complaint = Complaint::findOrFail($id);
+
+            if ($complaint->user_id !== $userId) {
+                throw new Exception('Unauthorized to update this complaint.', 403);
+            }
+
+            // 2. Guard Clause for Status (Case Insensitive & Trimmed)
+            if ($complaint->status->value !== ComplaintStatus::REQUESTED_INFO->value) {
+                throw new Exception('Updates allowed only when status is "Requested Info".', 422);
+            }
+
+            $updatePayload = [
+                'status' => ComplaintStatus::IN_PROGRESS->value// التغيير التلقائي للحالة هنا
+            ];
+
+            // 3. Update main complaint data
+            if (isset($data['description'])) {
+                $complaint->update(['description' => $data['description']]);
+            }
+
+            // Save old status for history record
+            $oldStatus = $complaint->status->value;
+
+            // Update Complaint
+            $complaint->update($updatePayload);
+
+            ComplaintHistory::create([
+                'complaint_id' => $complaint->id,
+                'user_id'      => $userId,
+                'action_type'  => 'STATUS_CHANGED',
+                'field_name'   => 'status',
+                'old_value'    => $oldStatus,
+                'new_value'    => 'In Progress',
+                'comment'      => "Status updated automatically to In Progress after user response.",
+            ]);
+
+            // 4. Handle Attachments and History if files exist
+            if ($files) {
+                $this->addAttachmentsAndHistory($complaint, $files, $userId);
+            }
+
+            return $complaint->load('attachments');
         });
     }
 
-
-    public function updateComplaintByUser(Complaint $complaint, array $data, int $userId): Complaint
+    protected function addAttachmentsAndHistory(Complaint $complaint, array $files, int $userId)
     {
+        $attachmentRecords = [];
+        $historyRecords = [];
 
-        $updateFields = [];
-
-        if (isset($data['description']) && $data['description'] !== $complaint->description) {
-            $updateFields['description'] = $data['description'];
-
-            // إنشاء سجل تاريخي لتغيير الوصف
-            $complaint->histories()->create([
-                'user_id' => $userId,
-                'action_type' => 'FIELD_UPDATE', // نوع الإجراء: تحديث حقل
-                'field_name' => 'description',
-                'old_value' => substr($complaint->description ?? '', 0, 255), // قيمة قديمة (نقتصرها لـ 255 حرف)
-                'new_value' => substr($data['description'], 0, 255), // قيمة جديدة
-                'comment' => 'تم تحديث الوصف من قبل المستخدم.',
-            ]);
-        }
-
-        // 4. الحفظ
-        if (!empty($updateFields)) {
-            $complaint->update($updateFields);
-        }
-
-
-
-        return $complaint;
-    }
-
-
-
-    public function addAttachmentsinhistory(Complaint $complaint, array $attachments, int $uploadingUserId)
-    {
-        $records = [];
-        $historyRecords = []; // مصفوفة لتخزين سجلات التاريخ
-
-        foreach ($attachments as $file) {
-            // حفظ الملف في مجلد 'public/complaints/attachments'
+        foreach ($files as $file) {
+            // Store File
             $path = $file->store('complaints/attachments', 'public');
-
             $url = Storage::disk('public')->url($path);
             $fileName = $file->getClientOriginalName();
-            $fileExtension = $file->getClientOriginalExtension();
 
-            $records[] = [
+            // Prepare Attachment Record
+            $attachmentRecords[] = [
                 'file_name' => $fileName,
                 'file_path' => $url,
-                'file_type' => $fileExtension,
+                'file_type' => $file->getClientOriginalExtension(),
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
 
-            // **إنشاء سجل تاريخي لإضافة المرفق**
+            // Prepare History Record
             $historyRecords[] = [
                 'complaint_id' => $complaint->id,
-                'user_id' => $uploadingUserId,
-                'action_type' => 'ATTACHMENT_ADDED', // نوع الإجراء: إضافة مرفق
-                'field_name' => 'attachment',
-                'old_value' => null,
-                'new_value' => $fileName, // اسم الملف الجديد كقيمة جديدة
-                'comment' => "تم إضافة المرفق: {$fileName} (النوع: {$fileExtension})",
-                'created_at' => now(),
-                'updated_at' => now(),
+                'user_id'      => $userId,
+                'action_type'  => 'ATTACHMENT_ADDED',
+                'field_name'   => 'attachment',
+                'new_value'    => $fileName,
+                'comment'      => "Attachment added: {$fileName}",
+                'created_at'   => now(),
+                'updated_at'   => now(),
             ];
         }
 
-        // حفظ المرفقات الجديدة في جدول المرفقات
-        $complaint->attachments()->createMany($records);
-
-        // **حفظ سجلات التاريخ دفعة واحدة**
-        if (!empty($historyRecords)) {
-            ComplaintHistory::insert($historyRecords);
-        }
+        // Batch Insert for better performance
+        $complaint->attachments()->createMany($attachmentRecords);
+        ComplaintHistory::insert($historyRecords);
     }
+    
+
+
+
 }

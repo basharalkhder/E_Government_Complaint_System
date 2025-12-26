@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Exceptions\AccountNotFoundException; 
+use App\Exceptions\AccountNotFoundException;
 use App\Exceptions\AccountNotVerifiedException;
 use App\Repositories\EloquentUserRepository;
 use App\Models\Role;
@@ -23,7 +23,7 @@ class UserService
     public function registerNewUser(array $data)
     {
 
-        $existingUser = $this->userRepository->findByEmail($data['email']);
+         $existingUser = $this->userRepository->findByEmail($data['email']);
 
         if ($existingUser) {
             // حالة أ: المستخدم موجود ومفعل بالفعل
@@ -64,12 +64,12 @@ class UserService
     // 2--
     public function authenticate(string $email, string $password): array
     {
-        
+
         $user = $this->userRepository->findByEmail($email);
 
-        
+
         if (!$user) {
-           
+
             throw new AccountNotFoundException('This account does not exist. Please create a new account.');
         }
 
@@ -80,7 +80,7 @@ class UserService
         }
 
         if (!$user->is_verified) {
-            throw new AccountNotVerifiedException('Your account is not verified. Please check your email for the verification link or OTP.');
+            throw new AccountNotVerifiedException('Your account is not verified. Please link your Telegram account and enter the OTP to activate it.');
         }
 
         $token = $this->userRepository->createAuthToken($user);

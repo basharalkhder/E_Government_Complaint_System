@@ -7,11 +7,12 @@ use Illuminate\Support\ServiceProvider;
 use App\Contracts\UserRepositoryInterface;
 use App\Repositories\EloquentUserRepository;
 
-use App\Contracts\ComplaintRepositoryInterface;
-use App\Repositories\EloquentComplaintRepository;
-
-use App\Models\Complaint; // 💡 تأكد من استيراد نموذج الشكوى
+use App\Models\Complaint;
 use App\Events\ComplaintStatusUpdated;
+
+use Illuminate\Support\Facades\Event;
+use Illuminate\Auth\Events\Login;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,11 +25,6 @@ class AppServiceProvider extends ServiceProvider
             UserRepositoryInterface::class,
             EloquentUserRepository::class
         );
-
-        $this->app->bind(
-            ComplaintRepositoryInterface::class,
-            EloquentComplaintRepository::class
-        );
     }
 
     /**
@@ -36,10 +32,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-       
+
+        // 1. Tracing: تتبع تسجيل دخول المستخدمين للنظام
+        Event::listen(function (Login $event) {
+            /** @var \App\Models\User $user */
+            $user = $event->user;
+            activity()
+                ->causedBy($user)
+                ->useLog('Authentication')
+                ->log('User logged into the system');
+        });
+
+
         Complaint::updated(function (Complaint $complaint) {
 
-           
+
             if ($complaint->isDirty('status')) {
 
                 event(new ComplaintStatusUpdated($complaint));

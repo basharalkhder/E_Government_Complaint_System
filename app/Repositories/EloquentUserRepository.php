@@ -5,10 +5,10 @@ namespace App\Repositories;
 use App\Models\User;
 use App\Contracts\UserRepositoryInterface;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\VerificationCodeMail; 
+use Illuminate\Support\Facades\Http;
+use App\Mail\VerificationCodeMail;
 
 class EloquentUserRepository implements UserRepositoryInterface
 {
@@ -30,7 +30,7 @@ class EloquentUserRepository implements UserRepositoryInterface
 
     public function find(int $id): ?User
     {
-        
+
         return User::find($id);
     }
 
@@ -45,7 +45,7 @@ class EloquentUserRepository implements UserRepositoryInterface
 
     public function generateAndSendOtp(User $user): void
     {
-        //  توليد رمز OTP (عادة 6 أرقام)
+        
         $otp = random_int(100000, 999999);
         $cacheKey = "otp:{$user->id}";
 
@@ -54,6 +54,29 @@ class EloquentUserRepository implements UserRepositoryInterface
         
         Mail::to($user->email)->send(new VerificationCodeMail($otp));
     }
+
+
+    // public function sendOtpViaTelegram(User $user, int $otp)
+    // {
+    //     $token = env('TELEGRAM_BOT_TOKEN');
+    //     $chatId = $user->telegram_chat_id;
+
+    //     // إذا لم يكن لديه تلغرام، نرسل إيميل كخيار بديل (Fallback)
+    //     if (!$chatId) {
+    //         Mail::to($user->email)->send(new VerificationCodeMail($otp));
+    //         return;
+    //     }
+
+    //     $message = "🔐 <b>نظام الشكاوى الحكومية</b>\n\n";
+    //     $message .= "رمز التحقق الخاص بك هو: <code>$otp</code>\n";
+    //     $message .= "صلاحية الرمز 5 دقائق.";
+
+    //     Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
+    //         'chat_id' => $chatId,
+    //         'text' => $message,
+    //         'parse_mode' => 'HTML'
+    //     ]);
+    // }
 
     public function verifyOtp(User $user, int $otp): bool
     {
@@ -72,15 +95,15 @@ class EloquentUserRepository implements UserRepositoryInterface
 
     public function updateVerificationStatus(User $user, bool $status): bool
     {
-      
+
         $user->is_verified = $status;
-        
+
         if ($status === true) {
             $user->email_verified_at = now();
         } else {
             $user->email_verified_at = null;
         }
-        
+
         return $user->save();
     }
 }

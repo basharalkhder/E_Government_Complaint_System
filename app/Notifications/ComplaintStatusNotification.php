@@ -41,7 +41,7 @@ class ComplaintStatusNotification extends Notification
         return (new MailMessage)
                     ->subject("تحديث حالة الشكوى: {$this->complaint->reference_number}")
                     ->greeting("مرحباً بك،")
-                    ->line("تم تحديث حالة الشكوى رقم **{$this->complaint->reference_number}** إلى **{$this->complaint->status}**.")
+                    ->line("تم تحديث حالة الشكوى رقم **{$this->complaint->reference_number}** إلى **{$this->complaint->status->value}**.")
                     ->line('يمكنك متابعة التفاصيل داخل التطبيق.')
                     ->action('عرض الشكوى', url('/complaints/' . $this->complaint->id)) 
                     ->salutation('مع تحيات فريق الدعم.');

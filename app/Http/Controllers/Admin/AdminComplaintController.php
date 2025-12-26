@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Complaint;
 use Illuminate\Http\Request;
-use App\Http\Resources\Employee\GetComplaintsResource;
+use App\Http\Resources\ComplaintHistoryResource;
 use App\Http\Resources\ComplaintResource;
 
 use Illuminate\Support\Facades\Response;
@@ -22,15 +22,10 @@ class AdminComplaintController extends Controller
         $this->adminComplaintService = $adminComplaintService;
     }
 
-
-
-    public function index(Request $request)
+    public function index()
     {
-
-        $complaints = $this->adminComplaintService->getFilteredComplaints($request);
-
-
-        return response_success(GetComplaintsResource::collection($complaints), 200, 'all complaints');
+        $complaints = $this->adminComplaintService->getAllComplaintsForAdmin();
+        return response_success(ComplaintResource::collection($complaints), 200, 'All complaints');
     }
 
     public function exportReports(Request $request)
@@ -38,20 +33,67 @@ class AdminComplaintController extends Controller
         return $this->adminComplaintService->exportComplaints($request);
     }
 
-    public function show($id)
+    // public function show($id)
+    // {
+    //     $complaint = Complaint::findOrFail($id);
+
+    //     // 1. التحميل المسبق للعلاقات الضرورية
+    //     $complaint->load([
+    //         // تحميل سجل التاريخ وترتيبه
+    //         'histories' => fn($query) => $query->with('user')->orderBy('created_at', 'desc'),
+    //         'user',        // المالك الأصلي
+    //         'entity',      // الجهة
+    //         'attachments', // المرفقات
+    //     ]);
+
+
+    //     return  response_success(ComplaintResource::make($complaint), 200, 'تم استعراض تفاصيل الشكوى مع سجل التاريخ الكامل.');
+    // }
+
+    public function getStatistics()
     {
-        $complaint = Complaint::findOrFail($id);
+        $stats = $this->adminComplaintService->getComplaintsStatistics();
 
-       // 1. التحميل المسبق للعلاقات الضرورية
-        $complaint->load([
-            // تحميل سجل التاريخ وترتيبه
-            'histories' => fn ($query) => $query->with('user')->orderBy('created_at', 'desc'),
-            'user',        // المالك الأصلي
-            'entity',      // الجهة
-            'attachments', // المرفقات
-        ]);
-
-        // 2. 🚨 إرجاع الاستجابة باستخدام المورد
-        return  response_success(ComplaintResource::make($complaint),200,'تم استعراض تفاصيل الشكوى مع سجل التاريخ الكامل.');
+        return response_success($stats ,200 ,'Complaints statistics retrieved successfully');
+        
     }
+
+    public function getHistory($id)
+    {
+        
+        $history = $this->adminComplaintService->getComplaintHistoryByComplaintId($id);
+        
+        return response_success(ComplaintHistoryResource::collection($history),200);
+        
+    }
+
+
+    public function getSystemTraces()
+{
+    $logs = $this->adminComplaintService->getAllTraces();
+
+    
+    $data = $logs->getCollection()->map(function ($log) {
+        return [
+            'id' => $log->id,
+            'action_date' => $log->created_at->format('Y-m-d H:i:s'),
+            'performed_by' => $log->causer->name ?? 'System', // هوية المستخدم
+            'event' => $log->description,
+            'target_type' => class_basename($log->subject_type),
+            'target_id' => $log->subject_id,
+            'target_url' => $this->adminComplaintService->getSubjectUrl($log), // الرابط القابل للضغط
+            'changes' => $log->properties, // القيم القديمة والجديدة
+        ];
+    });
+
+    return response()->json([
+        'success' => true,
+        'data' => $data,
+        'pagination' => [
+            'current_page' => $logs->currentPage(),
+            'last_page' => $logs->lastPage(),
+            'total' => $logs->total(),
+        ]
+    ], 200, [], JSON_UNESCAPED_UNICODE); // لضمان ظهور العربي في Postman
+}
 }

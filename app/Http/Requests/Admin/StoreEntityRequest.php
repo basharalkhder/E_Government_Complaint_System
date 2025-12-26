@@ -23,13 +23,12 @@ class StoreEntityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // قواعد التحقق من البيانات
             'name_ar' => 'required|string|max:255|unique:entities,name_ar',
             'name_en' => 'nullable|string|max:255',
             'code' => ['required', 'string', 'max:50', Rule::unique('entities', 'code')],
             'email' => 'nullable|email|max:255',
             'is_active' => 'boolean',
-            'notes' => 'nullable|string', // قد يكون هذا الحقل مطلوباً إذا كان يُرسل مع البيانات
+            'notes' => 'nullable|string',
         ];
     }
 

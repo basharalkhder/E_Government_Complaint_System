@@ -22,14 +22,25 @@ class StoreComplaintTypeRequest extends FormRequest
      */
     public function rules(): array
     {
-       return [
-            'name_ar' => 'required|string|max:100|unique:complaint_types,name_ar',
-            'code' => 'required|string|max:20|unique:complaint_types,code',
+        return [
+            'name_ar' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('complaint_types')->whereNull('deleted_at')
+            ],
+            'code' => [
+                'required',
+                'string',
+                'max:20',
+                
+                Rule::unique('complaint_types')->whereNull('deleted_at')
+            ],
             'related_department' => 'nullable|string|max:150',
             'entity_id' => [
                 'required',
                 'integer',
-                Rule::exists('entities', 'id')
+                Rule::exists('entities', 'id')->whereNull('deleted_at')
             ],
         ];
     }

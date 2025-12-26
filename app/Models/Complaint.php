@@ -2,23 +2,24 @@
 
 namespace App\Models;
 
+
+use App\Enums\ComplaintStatus;
 use Illuminate\Database\Eloquent\Model;
+
+use App\Traits\GlobalTracing;
 
 
 class Complaint extends Model
 {
+    use GlobalTracing;
 
     protected $casts = [
         'is_locked' => 'boolean',
         'locked_at' => 'datetime',
+        'status' => ComplaintStatus::class,
+
     ];
 
-    const STATUS_NEW = 'New';
-    const STATUS_IN_PROCESS = 'In Progress';
-    const STATUS_COMPLETED = 'Resolved';
-    const STATUS_REJECTED = 'Rejected';
-
-    const STATUS_REQUESTED_INFO = 'Requested Info';
 
     protected $fillable = [
         'user_id',

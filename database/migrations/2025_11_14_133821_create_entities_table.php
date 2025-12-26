@@ -27,6 +27,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
 
             $table->text('notes')->nullable();
+            $table->softDeletes();
             $table->timestamps();
         });
     }

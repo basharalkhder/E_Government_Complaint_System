@@ -3,9 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\GlobalTracing;
 
 class ComplaintAttachment extends Model
 {
+    use GlobalTracing;
 
     protected $fillable = [
         'complaint_id',

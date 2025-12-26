@@ -14,9 +14,10 @@ return new class extends Migration
         Schema::create('complaint_types', function (Blueprint $table) {
             $table->id();
             $table->string('name_ar', 100)->unique();
-            $table->string('code', 20)->unique(); // الرمز الداخلي (مهم كمرجع)
+            $table->string('code', 20)->unique(); 
             $table->string('related_department', 150)->nullable();
             $table->foreignId('entity_id')->nullable()->constrained('entities');
+            $table->softDeletes();
             $table->timestamps();
         });
     }

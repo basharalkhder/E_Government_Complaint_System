@@ -5,13 +5,14 @@ namespace App\Listeners;
 use App\Events\ComplaintStatusUpdated;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
-use App\Notifications\ComplaintStatusNotification; 
+use App\Notifications\ComplaintStatusNotification;
 use Illuminate\Support\Facades\Log;
 use App\Notifications\RequestInfoNotification;
+use App\Enums\ComplaintStatus;
 
 use App\Models\Complaint;
 
-class SendComplaintStatusNotification 
+class SendComplaintStatusNotification
 {
     /**
      * Create the event listener.
@@ -37,17 +38,16 @@ class SendComplaintStatusNotification
 
         // 2. اختيار الإشعار المناسب بناءً على حالة الشكوى
         $notification = null;
-        
+
         switch ($complaint->status) {
-            case Complaint::STATUS_REQUESTED_INFO:
+            case ComplaintStatus::REQUESTED_INFO:
                 // عند طلب معلومات، نستخدم الإشعار الخاص الذي يعرض ملاحظات الإدارة
                 $notification = new RequestInfoNotification($complaint);
                 break;
 
-            case Complaint::STATUS_COMPLETED:
-            case Complaint::STATUS_REJECTED:
-            case Complaint::STATUS_IN_PROCESS:
-                // للحالات الأخرى، نستخدم الإشعار العام
+            case ComplaintStatus::RESOLVED: 
+            case ComplaintStatus::REJECTED:
+            case ComplaintStatus::IN_PROGRESS:
                 $notification = new ComplaintStatusNotification($complaint);
                 break;
 
@@ -61,5 +61,4 @@ class SendComplaintStatusNotification
             $user->notify($notification);
         }
     }
-    }
-
+}
