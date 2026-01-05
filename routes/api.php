@@ -132,7 +132,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('all-complaints', [AdminComplaintController::class, 'index']);
 
     // مسار تصدير التقارير (CSV,pdf)
-    Route::get('complaints/export', [AdminComplaintController::class, 'exportReports']); //done
+    Route::get('complaints/file', [AdminComplaintController::class, 'exportReports']); //done
 
     //الإحصائيات
     Route::get('complaints/statistics', [AdminComplaintController::class, 'getStatistics']);

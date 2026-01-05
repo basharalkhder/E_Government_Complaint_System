@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Services\ComplaintTypeService;
 use App\Http\Requests\Admin\StoreComplaintTypeRequest;
 use App\Http\Requests\Admin\UpdateComplaintTypeRequest;
-use App\http\Resources\ComplaintTypeResource;
+use App\Http\Resources\ComplaintTypeResource;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class ComplaintTypeController extends Controller
