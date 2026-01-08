@@ -77,7 +77,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     //تعديل جهة 
     Route::post('entities/{entity}', [EntityController::class, 'update']);
     //حذف جهة
-    Route::delete('entities/{entity}', [EntityController::class, 'delete_Entity']);
+    Route::post('entities/{entity}', [EntityController::class, 'delete_Entity']);
 
     //=================================================================================
 
@@ -94,7 +94,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('update/employee/{employee}', [ManageEmployeeController::class, 'updateEmployee']);
 
     //حذف حساب موظف
-    Route::delete('delete/employee/{employee}', [ManageEmployeeController::class, 'deleteEmployee']);
+    Route::post('delete/employee/{employee}', [ManageEmployeeController::class, 'deleteEmployee']);
 
     //==============================================================================================
 
@@ -112,7 +112,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::post('update/complaint-types/{complaint_type}', [ComplaintTypeController::class, 'updateComplaintType']);
 
     //حذف نوع شكوى
-    Route::delete('delete/complaint-types/{complaint_type}', [ComplaintTypeController::class, 'deleteTypeComplaint']);
+    Route::post('delete/complaint-types/{complaint_type}', [ComplaintTypeController::class, 'deleteTypeComplaint']);
 
     //==================================================================================================
 
@@ -132,7 +132,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('all-complaints', [AdminComplaintController::class, 'index']);
 
     // مسار تصدير التقارير (CSV,pdf)
-    Route::get('complaints/file', [AdminComplaintController::class, 'exportReports']); //done
+    Route::get('complaints/export-data', [AdminComplaintController::class, 'exportReports']); //done
 
     //الإحصائيات
     Route::get('complaints/statistics', [AdminComplaintController::class, 'getStatistics']);

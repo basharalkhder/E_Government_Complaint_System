@@ -10,3 +10,15 @@ Artisan::command('inspire', function () {
 
 
 Schedule::command('telescope:prune')->everyThirtyMinutes();
+
+// // تنفيذ النسخ الاحتياطي لقاعدة البيانات والملفات تلقائياً كل يوم
+// Schedule::command('backup:run')->daily()->at('00:00');
+
+// // تنظيف النسخ القديمة لضمان عدم امتلاء القرص الصلب
+// Schedule::command('backup:clean')->daily()->at('01:00');
+
+
+ Schedule::command('backup:run')->everyMinute();
+
+
+Schedule::command('backup:clean')->everyMinute();

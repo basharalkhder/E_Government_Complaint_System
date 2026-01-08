@@ -1,0 +1,56 @@
+
+services:
+  # موزع الأحمال (Load Balancer)
+  load-balancer:
+    image: nginx:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app-server-1
+      - app-server-2
+
+  # السيرفر الأول
+  app-server-1:
+    build: .
+    environment:
+      - APP_KEY=base64:j0Xl3cOSo5FDTMRD6zXcfxPT31H2L76NvlA0gnJzTwA=
+      - SESSION_DRIVER=redis
+      - REDIS_HOST=redis-server
+      - DB_HOST=mysql-db
+      - FILESYSTEM_DISK=local
+    volumes:
+      - .:/var/www/html # ربط الكود
+      - shared-storage:/var/www/html/storage/app/public # المجلد المشترك للمرفقات
+
+  # السيرفر الثاني
+  app-server-2:
+    build: .
+    environment:
+      - APP_KEY=base64:j0Xl3cOSo5FDTMRD6zXcfxPT31H2L76NvlA0gnJzTwA=
+      - SESSION_DRIVER=redis
+      - REDIS_HOST=redis-server
+      - DB_HOST=mysql-db
+      - FILESYSTEM_DISK=local
+    volumes:
+      - .:/var/www/html # ربط الكود
+      - shared-storage:/var/www/html/storage/app/public # المجلد المشترك للمرفقات
+
+  # الريديس (للجلسات والكاش المشترك)
+  redis-server:
+    image: redis:alpine
+
+  # قاعدة البيانات (MySQL)
+  mysql-db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: E_Government_Complaint_System
+      MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - db-data:/var/lib/mysql # لضمان عدم ضياع البيانات عند إطفاء الحاويات
+
+# تعريف الـ Volumes المشتركة
+volumes:
+  shared-storage: # هذا هو المجلد الذي سيجمع صور الشكاوى لكل السيرفرات
+  db-data:        # لتخزين بيانات قاعدة البيانات بشكل دائم

@@ -9,6 +9,9 @@ use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
 use App\Exceptions\ResendVerificationException;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
+use App\Notifications\LoginFailedNotification;
 
 class UserService
 {
@@ -23,7 +26,7 @@ class UserService
     public function registerNewUser(array $data)
     {
 
-         $existingUser = $this->userRepository->findByEmail($data['email']);
+        $existingUser = $this->userRepository->findByEmail($data['email']);
 
         if ($existingUser) {
             // حالة أ: المستخدم موجود ومفعل بالفعل
@@ -64,26 +67,39 @@ class UserService
     // 2--
     public function authenticate(string $email, string $password): array
     {
+        
+        $throttleKey = Str::lower($email) . '|' . request()->ip();
+
+        
+        if (RateLimiter::tooManyAttempts($throttleKey, 3)) { 
+            $seconds = RateLimiter::availableIn($throttleKey);
+            throw new \Exception("You have exceeded the maximum number of failed login attempts. Your account has been temporarily locked. Please try again in $seconds seconds.");
+        }
+
 
         $user = $this->userRepository->findByEmail($email);
 
 
-        if (!$user) {
+        if (!$user || !Hash::check($password, $user->password)) {
+            
+            RateLimiter::hit($throttleKey, 600);
 
-            throw new AccountNotFoundException('This account does not exist. Please create a new account.');
-        }
+            
+            event(new \Illuminate\Auth\Events\Failed('sanctum', $user, [
+                'email' => $email,
+            ]));
 
-        if (!Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages([
-                'email' => ['Invalid credentials.'],
-            ]);
+            throw ValidationException::withMessages(['email' => ['بيانات الاعتماد غير صحيحة.']]);
         }
+       
+        RateLimiter::clear($throttleKey);
 
         if (!$user->is_verified) {
-            throw new AccountNotVerifiedException('Your account is not verified. Please link your Telegram account and enter the OTP to activate it.');
+            throw new AccountNotVerifiedException('Your account is not verified.');
         }
 
         $token = $this->userRepository->createAuthToken($user);
+
 
         return [
             'user' => $user,

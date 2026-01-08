@@ -73,41 +73,49 @@ class AdminComplaintService
         $pdf->setPaper('a4', 'landscape');
         $fileName = 'complaint_report_' . now()->format('Ymd_His') . '.pdf';
 
-        return $pdf->download($fileName);
+        return $pdf->download($fileName, [
+            'Content-Type' => 'application/pdf',
+            'Access-Control-Expose-Headers' => 'Content-Disposition'
+        ]);
     }
 
     private function exportToCsv(Collection $complaints): StreamedResponse
     {
-        $csvData[] = ['ID', 'Reference', 'Status', 'Entity Name (AR)', 'Complainant Name', 'Submission Date', 'Description'];
-
-        foreach ($complaints as $complaint) {
-            $csvData[] = [
-                $complaint->id,
-                $complaint->reference_number,
-                $complaint->status->value,
-                $complaint->entity->name_ar ?? 'undefined',
-                $complaint->user->name ?? ' undefined',
-                $complaint->created_at->format('Y-m-d H:i:s'),
-                str_replace(["\r", "\n", ","], " ", $complaint->description),
-            ];
-        }
-
         $fileName = 'complaint_report_' . now()->format('Ymd_His') . '.csv';
+
         $headers = [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=utf-8', 
             'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
         ];
 
-        $callback = function () use ($csvData) {
+        $callback = function () use ($complaints) {
             $file = fopen('php://output', 'w');
+
+            
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
-            foreach ($csvData as $row) {
-                fputcsv($file, $row);
+
+            
+            fputcsv($file, ['ID', 'Reference', 'Status', 'Entity Name (AR)', 'Complainant Name', 'Submission Date', 'Description']);
+
+            
+            foreach ($complaints as $complaint) {
+                fputcsv($file, [
+                    $complaint->id,
+                    $complaint->reference_number,
+                    $complaint->status->value ?? $complaint->status,
+                    $complaint->entity->name_ar ?? 'undefined',
+                    $complaint->user->name ?? 'undefined',
+                    $complaint->created_at->format('Y-m-d H:i:s'),
+                    str_replace(["\r", "\n", ","], " ", $complaint->description),
+                ]);
             }
             fclose($file);
         };
 
-        return Response::stream($callback, 200, $headers);
+        return response()->stream($callback, 200, $headers);
     }
 
 
@@ -152,28 +160,28 @@ class AdminComplaintService
 
     public function getAllTraces()
     {
-        return Activity::with('causer') // جلب هوية المستخدم
+        return Activity::with('causer')
             ->latest()
             ->paginate(15);
     }
 
-    
+
     public function getSubjectUrl($log)
     {
-        
+
         if (!$log->subject_id) return null;
 
-        
+
         $path = match ($log->subject_type) {
             'App\Models\User'      => 'users',
             'App\Models\Entity'    => 'entities',
-            'App\Models\Complaint' => 'all-complaints', // حسب الاسم الموجود عندك في api.php
+            'App\Models\Complaint' => 'all-complaints',
             'App\Models\Role'      => 'roles',
             default                => null,
         };
 
         if ($path) {
-            // بناء الرابط يدوياً: domain.com/api/path/id
+
             return url("/api/{$path}/{$log->subject_id}");
         }
 

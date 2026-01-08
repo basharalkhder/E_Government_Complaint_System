@@ -33,22 +33,7 @@ class AdminComplaintController extends Controller
         return $this->adminComplaintService->exportComplaints($request);
     }
 
-    // public function show($id)
-    // {
-    //     $complaint = Complaint::findOrFail($id);
-
-    //     // 1. التحميل المسبق للعلاقات الضرورية
-    //     $complaint->load([
-    //         // تحميل سجل التاريخ وترتيبه
-    //         'histories' => fn($query) => $query->with('user')->orderBy('created_at', 'desc'),
-    //         'user',        // المالك الأصلي
-    //         'entity',      // الجهة
-    //         'attachments', // المرفقات
-    //     ]);
-
-
-    //     return  response_success(ComplaintResource::make($complaint), 200, 'تم استعراض تفاصيل الشكوى مع سجل التاريخ الكامل.');
-    // }
+    
 
     public function getStatistics()
     {
@@ -77,12 +62,12 @@ class AdminComplaintController extends Controller
         return [
             'id' => $log->id,
             'action_date' => $log->created_at->format('Y-m-d H:i:s'),
-            'performed_by' => $log->causer->name ?? 'System', // هوية المستخدم
+            'performed_by' => $log->causer->name ?? 'System', 
             'event' => $log->description,
             'target_type' => class_basename($log->subject_type),
             'target_id' => $log->subject_id,
-            'target_url' => $this->adminComplaintService->getSubjectUrl($log), // الرابط القابل للضغط
-            'changes' => $log->properties, // القيم القديمة والجديدة
+            'target_url' => $this->adminComplaintService->getSubjectUrl($log), 
+            'changes' => $log->properties, 
         ];
     });
 
@@ -94,6 +79,6 @@ class AdminComplaintController extends Controller
             'last_page' => $logs->lastPage(),
             'total' => $logs->total(),
         ]
-    ], 200, [], JSON_UNESCAPED_UNICODE); // لضمان ظهور العربي في Postman
+    ], 200, [], JSON_UNESCAPED_UNICODE); 
 }
 }

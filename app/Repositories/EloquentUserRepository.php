@@ -45,41 +45,23 @@ class EloquentUserRepository implements UserRepositoryInterface
 
     public function generateAndSendOtp(User $user): void
     {
-        
+
         $otp = random_int(100000, 999999);
         $cacheKey = "otp:{$user->id}";
 
         Cache::put($cacheKey, $otp, now()->addMinutes(5));
 
-        
         Mail::to($user->email)->send(new VerificationCodeMail($otp));
+        // Mail::to($user->email)->queue(new VerificationCodeMail($otp));
     }
 
 
-    // public function sendOtpViaTelegram(User $user, int $otp)
-    // {
-    //     $token = env('TELEGRAM_BOT_TOKEN');
-    //     $chatId = $user->telegram_chat_id;
 
-    //     // إذا لم يكن لديه تلغرام، نرسل إيميل كخيار بديل (Fallback)
-    //     if (!$chatId) {
-    //         Mail::to($user->email)->send(new VerificationCodeMail($otp));
-    //         return;
-    //     }
-
-    //     $message = "🔐 <b>نظام الشكاوى الحكومية</b>\n\n";
-    //     $message .= "رمز التحقق الخاص بك هو: <code>$otp</code>\n";
-    //     $message .= "صلاحية الرمز 5 دقائق.";
-
-    //     Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
-    //         'chat_id' => $chatId,
-    //         'text' => $message,
-    //         'parse_mode' => 'HTML'
-    //     ]);
-    // }
 
     public function verifyOtp(User $user, int $otp): bool
     {
+
+
         $cacheKey = "otp:{$user->id}";
         $storedOtp = Cache::get($cacheKey);
 

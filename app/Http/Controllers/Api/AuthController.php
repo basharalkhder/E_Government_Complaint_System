@@ -63,7 +63,7 @@ class AuthController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) { 
             return response_error(Null, 401, 'Invalid email or password.');
         } catch (\Exception $e) {
-            return response_error(Null, 500, 'An unexpected error occurred during login.');
+            return response_error(null, 500, $e->getMessage() ?: 'An unexpected error occurred during login.');
         }
     }
 
