@@ -55,6 +55,7 @@ class ComplaintController extends Controller
 
         $userId = Auth::guard('sanctum')->id();
 
+
         $complaint = $this->complaintService->handleComplaintSubmission($userId, $data);
 
 

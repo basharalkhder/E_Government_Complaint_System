@@ -65,6 +65,10 @@ class ComplaintTypeService
     public function deleteTypeComplaint($id)
     {
         $complaintType = $this->getComplaintTypeById($id);
+
+        if ($complaintType->complaints()->count() > 0) {
+            throw new \Exception("Cannot delete: This type has " . $complaintType->complaints()->count() . " linked complaints.");
+        }
         return $complaintType->delete();
     }
 }

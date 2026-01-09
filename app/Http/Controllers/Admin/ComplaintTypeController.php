@@ -75,6 +75,9 @@ class ComplaintTypeController extends Controller
             return response_success(null, 200, 'Complaint Type deleted successfully');
         } catch (ModelNotFoundException $e) {
             return response_error(null, 404, 'Complaint Type not found');
+        } catch (\Exception $e) {
+           
+            return response_error(null, 400, $e->getMessage());
         }
     }
 }

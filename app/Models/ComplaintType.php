@@ -19,6 +19,12 @@ class ComplaintType extends Model
         'entity_id',
     ];
 
+    public function complaints()
+    {
+        
+        return $this->hasMany(Complaint::class, 'complaint_type_code', 'code');
+    }
+
 
     /**
      * العلاقة: نوع الشكوى ينتمي لجهة مسؤولة واحدة.

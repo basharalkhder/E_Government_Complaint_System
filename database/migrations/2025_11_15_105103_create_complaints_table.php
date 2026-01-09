@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('complaint_type_code', 20);
             $table->foreign('complaint_type_code')
                 ->references('code')
-                ->on('complaint_types');
+                ->on('complaint_types')->onUpdate('cascade');;
 
             $table->string('department', 150);
             $table->text('description');

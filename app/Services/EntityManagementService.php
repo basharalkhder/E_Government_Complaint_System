@@ -65,11 +65,11 @@ class EntityManagementService
     {
         $entity = $this->getEntityById($id);
 
+        // Check if any complaint is linked to this entity
+        if ($entity->complaints()->exists()) {
+            throw new \Exception("Cannot delete: This entity is linked to existing complaints.");
+        }
+
         return $entity->delete();
     }
-
-    
-   
-
-   
 }

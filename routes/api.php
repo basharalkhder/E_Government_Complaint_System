@@ -29,6 +29,8 @@ Route::post('login', [AuthController::class, 'login']);
 //done
 Route::post('verify-otp', [AuthController::class, 'verify']); //التفعيل otp
 
+//jmeter
+// Route::get('complaints/dependencies', [ComplaintController::class, 'getFormDependencies']); 
 
 
 Route::middleware(['auth:sanctum', 'role:citizen', 'verified'])->group(function () {
@@ -39,7 +41,7 @@ Route::middleware(['auth:sanctum', 'role:citizen', 'verified'])->group(function 
     Route::post('{complaint_id}/update-by-user', [ComplaintController::class, 'updateByUser']); //تحديث الشكوى 
 
     //done
-    Route::get('complaints/dependencies', [ComplaintController::class, 'getFormDependencies']); //جلب أنواع الشكاوي
+   Route::get('complaints/dependencies', [ComplaintController::class, 'getFormDependencies']); //جلب أنواع الشكاوي
 
     //done
     Route::get('getComplaints', [ComplaintController::class, 'index']); //عرض الشكاوي الخاصة بالعميل
@@ -143,7 +145,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::get('admin/complaints/{id}/history', [AdminComplaintController::class, 'getHistory']);
 
     //مراقبة جميع العمليات بالنظام
-    // ما في داعي تربطو اذا بدك
+    
     Route::get('admin/system-traces', [AdminComplaintController::class, 'getSystemTraces']);
 });
 

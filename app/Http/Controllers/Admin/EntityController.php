@@ -27,11 +27,12 @@ class EntityController extends Controller
         return response_success(StoreEntityResource::collection($entities), 200, 'all entites');
     }
 
-    public function show($id){
-        try{
-        $entity = $this->entityManagementService->getEntityById($id);
-        return response_success(new StoreEntityResource($entity),200);
-        }catch(ModelNotFoundException $e) {
+    public function show($id)
+    {
+        try {
+            $entity = $this->entityManagementService->getEntityById($id);
+            return response_success(new StoreEntityResource($entity), 200);
+        } catch (ModelNotFoundException $e) {
             return response_error(null, 404, 'Entity Not Found');
         }
     }
@@ -73,12 +74,9 @@ class EntityController extends Controller
             return response_success(null, 200, 'Entity deleted successfully');
         } catch (ModelNotFoundException $e) {
             return response_error(null, 404, 'Entity Not Found');
+        } catch (\Exception $e) {
+            
+            return response_error(null, 400, $e->getMessage());
         }
     }
-
-
-
-   
-
-
 }
